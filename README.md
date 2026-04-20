@@ -8,6 +8,28 @@
 ```
 npm init -y                                                          
 npm install express socket.io web-push body-parser
+```
 
-node server.js
+Для открытия http://
+```
+npm start
+```
+
+Для генерации VAPID ключей:
+```
+node -e "const webpush = require('web-push'); console.log(webpush.generateVAPIDKeys());"
+```
+
+Для создания сертификата https:
+```
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 3650 \                          
+  -keyout localhost.key \
+  -out localhost.crt \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+```
+
+Для открытия https://
+```
+npm run start:https
 ```

@@ -1,9 +1,11 @@
 {
   "name": "fbd_kr3_soldatov",
-  "version": "1.0.0",
+  "version": "1.0",
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node server.js",
+    "start:https": "USE_HTTPS=true node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

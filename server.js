@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
 const socketIo = require('socket.io');
 const webpush = require('web-push');
 const bodyParser = require('body-parser');
@@ -7,30 +8,41 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
 
-// Для HTTPS в продакшене нужно использовать https.createServer с сертификатами
-// В разработке можно оставить HTTP (Service Worker будет работать на localhost)
+// Определяем, использовать ли HTTPS
+const useHttps = process.env.USE_HTTPS === 'true';
+let server;
+
+if (useHttps) {
+    try {
+        const options = {
+            key: fs.readFileSync(path.join(__dirname, 'localhost.key')),
+            cert: fs.readFileSync(path.join(__dirname, 'localhost.crt'))
+        };
+        server = https.createServer(options, app);
+        console.log('HTTPS server will be used');
+    } catch (err) {
+        console.error('Failed to read SSL certificates. Falling back to HTTP.', err.message);
+        server = http.createServer(app);
+    }
+} else {
+    server = http.createServer(app);
+    console.log('HTTP server will be used (USE_HTTPS=true for HTTPS)');
+}
+
+const io = socketIo(server);
 
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Хранилище подписок push (в реальном проекте используйте БД)
+// Хранилище подписок и таймеров
 let subscriptions = {};
-// Хранилище активных таймеров напоминаний
 const activeReminders = new Map();
 
-// Генерация VAPID ключей (выполните один раз и сохраните)
-// Для генерации: const vapidKeys = webpush.generateVAPIDKeys(); console.log(vapidKeys);
-// Вставьте свои ключи ниже
-//
-// const vapidKeys = webpush.generateVAPIDKeys();
-// console.log(vapidKeys);
-
+// ===== VAPID ключи (замените на свои) =====
 const vapidKeys = {
-    publicKey: 'BKtLedRituvWjc8sO0I5MSkW9JyZ-eSyJhSMFGp3UQxXKC4aZYhPdYQ4mI4BxJwNFD-3yfzoS7XbGfQTeet39MA',
-    privateKey: '5IirAf-SjLc7mIB_XiEPTYU2IA-H7YOxX5_KMyf8URM'
+    publicKey: 'BELx42JK6dBeBu23MInlntxRlDelsBRgz1Jpgl-ycu_Jk8FahrFvFmtnDgcgLjsA5-BDH-JxAWMPgc-36Ul5tlo',
+    privateKey: 'Xej9qYqIbJhN1FpG2OjZEP90OJT4WRhCtC7x8ybIt_k'
 };
 
 webpush.setVapidDetails(
@@ -39,41 +51,46 @@ webpush.setVapidDetails(
     vapidKeys.privateKey
 );
 
-// Отправка VAPID публичного ключа клиенту
+// Отдача публичного ключа
 app.get('/vapidPublicKey', (req, res) => {
     res.json({ publicKey: vapidKeys.publicKey });
 });
+
+// Эндпоинт для получения количества подписок (для отладки)
+app.get('/subscription-count', (req, res) => {
+    res.json({ count: Object.keys(subscriptions).length });
+});
+
+// Подписка
 app.post('/subscribe', (req, res) => {
     const subscription = req.body;
     const id = subscription.endpoint;
     subscriptions[id] = subscription;
+    fs.writeFileSync('subscriptions.json', JSON.stringify(subscriptions, null, 2));
     console.log(`✅ New subscription added. Total active: ${Object.keys(subscriptions).length}`);
     res.status(201).json({});
 });
 
+// Отписка
 app.post('/unsubscribe', (req, res) => {
     const subscription = req.body;
     const id = subscription.endpoint;
     delete subscriptions[id];
+    fs.writeFileSync('subscriptions.json', JSON.stringify(subscriptions, null, 2));
     console.log(`❌ Subscription removed. Total active: ${Object.keys(subscriptions).length}`);
     res.status(200).json({});
 });
 
-// Эндпоинт для переноса напоминания (действие "Отложить")
+// Перенос напоминания
 app.post('/snooze', (req, res) => {
     const { taskId, snoozeMinutes } = req.body;
-    // Здесь должна быть логика обновления reminder в хранилище задач
-    // Но для упрощения просто планируем новое уведомление
     const newReminderTime = Date.now() + snoozeMinutes * 60 * 1000;
-    console.log(`Task ${taskId} snoozed to ${new Date(newReminderTime)}`);
-    // Предположим, что мы храним задачи в памяти сервера (для реального приложения нужна синхронизация)
-    // В этом примере мы не реализуем полноценное обновление localStorage на сервере
-    // Вместо этого просто планируем уведомление
+    console.log(`⏰ Task ${taskId} snoozed to ${new Date(newReminderTime)}`);
     scheduleReminder(taskId, 'Задача отложена', newReminderTime);
     res.json({ success: true });
 });
 
-// Функция планирования уведомления
+// Планирование напоминания
 function scheduleReminder(taskId, taskText, reminderTime) {
     const now = Date.now();
     const delay = reminderTime - now;
@@ -134,6 +151,7 @@ io.on('connection', (socket) => {
     socket.on('newTask', (task) => {
         console.log('New task received:', task);
         io.emit('taskAdded', task);
+
         if (task.reminder && task.reminder > Date.now()) {
             console.log(`📅 Task has reminder at ${new Date(task.reminder).toLocaleString()}`);
             scheduleReminder(task.id, task.text, task.reminder);
@@ -149,5 +167,6 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    const protocol = useHttps ? 'https' : 'http';
+    console.log(`Server running on ${protocol}://localhost:${PORT}`);
 });
