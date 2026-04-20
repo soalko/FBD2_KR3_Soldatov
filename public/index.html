@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#4a90e2">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/style.css">
+    <title>Заметки PWA</title>
+</head>
+<body>
+<header>
+    <h1>Мои заметки</h1>
+    <nav>
+        <a href="/">Главная</a>
+        <a href="/about.html">О нас</a>
+    </nav>
+</header>
+
+<main>
+    <section class="add-task">
+        <h2>Добавить заметку</h2>
+        <form id="task-form">
+            <input type="text" id="task-text" placeholder="Текст заметки" required>
+            <label>
+                <input type="checkbox" id="enable-reminder"> Установить напоминание
+            </label>
+            <input type="datetime-local" id="reminder-time" disabled>
+            <button type="submit">Добавить</button>
+        </form>
+    </section>
+
+    <section class="tasks-list">
+        <h2>Список заметок</h2>
+        <ul id="tasks-container"></ul>
+    </section>
+
+    <section class="push-controls">
+        <h2>Уведомления</h2>
+        <button id="subscribe-push">Включить уведомления</button>
+        <button id="unsubscribe-push" style="display:none;">Отключить уведомления</button>
+        <p id="push-status"></p>
+    </section>
+</main>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/client.js"></script>
+</body>
+</html>
